@@ -67,7 +67,7 @@ pub async fn process_excel_file(
   let items_code_unique = items_code_sheet
     .rows()
     .skip(1)
-    .map(|row| row[item_code_idx].to_string().replace(" ", "_"))
+    .map(|row| row[item_code_idx].to_string().replace(' ', "_"))
     .unique();
   let item_code_size_unique = items_code_sheet
     .rows()
@@ -113,9 +113,9 @@ pub async fn process_excel_file(
       item_code_size_unique
         .par_iter()
         .zip(size_text_unique_zh.par_iter())
-        .filter(|(row, _)| row[item_code_idx].to_string().replace(" ", "_") == code)
+        .filter(|(row, _)| row[item_code_idx].to_string().replace(' ', "_") == code)
         .map(|(row, size_text_zh)| ItemInfo {
-          code: row[item_code_idx].to_string().replace(" ", "_"),
+          code: row[item_code_idx].to_string().replace(' ', "_"),
           size_code: get_size_code(row[size_code_idx].to_string().as_str()),
           size_text: size_text_zh.to_owned(),
         })
@@ -127,10 +127,9 @@ pub async fn process_excel_file(
     let item_code = item_infos[0].code.clone();
     let mut table_head = item_infos[0]
       .size_text
-      .replace("：", ":")
+      .replace('：', ":")
       .replace(": ", ":")
       .split_whitespace()
-      .par_bridge()
       .map(|s| s.split(':').collect_vec()[0].to_string())
       .collect::<Vec<_>>();
     table_head.insert(0, String::from("尺码"));
@@ -139,10 +138,9 @@ pub async fn process_excel_file(
       .map(|item_info| {
         let mut size_row_raw = item_info
           .size_text
-          .replace("：", ":")
+          .replace('：', ":")
           .replace(": ", ":")
           .split_whitespace()
-          .par_bridge()
           .map(|s| s.split(':').collect_vec()[1].to_string())
           .collect::<Vec<_>>();
         size_row_raw.insert(0, item_info.size_code.to_owned());
@@ -200,7 +198,10 @@ fn translate_text(text: impl AsRef<[String]>) -> Result<Vec<String>> {
   )
 }
 fn escape_text_pre_translate(s: impl AsRef<str>) -> String {
-  s.as_ref().replace("ゆき", "長さ").replace("着丈", "袖長さ")
+  s.as_ref()
+    .replace("ゆき", "袖長さ")
+    .replace("着丈", "ボディー長さ")
+    .replace("ゆき丈", "袖長さ")
 }
 
 fn escape_text(input: &str) -> String {

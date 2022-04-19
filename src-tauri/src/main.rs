@@ -5,7 +5,6 @@
 
 mod config;
 mod custom_command;
-mod translate;
 
 use std::ops::Deref;
 
@@ -16,7 +15,7 @@ pub const APP_IDENTIFIER: &str = "Size Table Generator";
 fn main() {
   tauri::Builder::default()
     .setup(|app| {
-      let mut path_base = tauri::api::path::app_dir(app.config().deref()).unwrap();
+      let path_base = tauri::api::path::app_dir(app.config().deref()).unwrap();
       if tauri::api::dir::is_dir(&path_base).is_err() {
         std::fs::create_dir(path_base).unwrap();
       }

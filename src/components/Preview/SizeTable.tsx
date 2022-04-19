@@ -6,6 +6,7 @@ import { TableTitle } from "../../styles/styleAtoms/Table";
 import styled from "styled-components";
 
 export const SizeTable = ({ id, data }: { id: string; data: ItemTable }) => {
+  console.log(data);
   return (
     <Wrapper id={id}>
       <TableTitle>尺码表</TableTitle>

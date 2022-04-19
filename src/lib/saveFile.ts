@@ -5,7 +5,7 @@ export async function saveElementToPath(elementId: string, dest: string) {
   const canvas = await html2canvas(document.querySelector(`#${elementId}`)!);
   canvas.toBlob(async (blob) => {
     const buf = await blob?.arrayBuffer();
-    await writeBinaryFile({ contents: buf!, path: dest });
+    await writeBinaryFile({ contents: new Uint8Array(buf!), path: dest });
   });
 }
 
