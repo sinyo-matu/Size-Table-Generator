@@ -36,6 +36,7 @@ pub async fn translate_texts(content: impl AsRef<[String]>) -> Result<Vec<String
     query.insert(k.into(), v.into());
   }
   let request = HttpRequestBuilder::new("post", "https://api-free.deepl.com/v2/translate")
+    .unwrap()
     .query(query)
     .response_type(ResponseType::Json);
 

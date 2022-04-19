@@ -30,7 +30,7 @@ struct ItemMeta {
   table: ItemTable,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct ProcessingStatePayload {
   state: String,
 }
