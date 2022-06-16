@@ -205,7 +205,10 @@ fn escape_text_pre_translate(s: impl AsRef<str>) -> String {
 }
 
 fn escape_text(input: &str) -> String {
-  input.replace("车身宽度", "体宽").replace("YUKI", "臂展")
+  input
+    .replace("车身宽度", "体宽")
+    .replace("YUKI", "臂展")
+    .replace("内裤", "跨部下方")
 }
 
 fn get_size_code(num_str: &str) -> String {
