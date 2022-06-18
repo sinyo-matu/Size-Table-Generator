@@ -6,7 +6,12 @@
 mod config;
 mod custom_command;
 
-use std::ops::Deref;
+use phdb_translate::TranslateClient;
+use std::{
+  ops::Deref,
+  sync::{Arc, Mutex},
+};
+use tauri::Manager;
 
 use custom_command::process_excel_file;
 
@@ -19,6 +24,10 @@ fn main() {
       if tauri::api::dir::is_dir(&path_base).is_err() {
         std::fs::create_dir(path_base).unwrap();
       }
+      let translate_client = tauri::async_runtime::block_on(TranslateClient::new()).unwrap();
+      let shared_translate_client = Arc::new(Mutex::new(translate_client));
+      let handler = app.handle();
+      handler.manage(shared_translate_client);
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![process_excel_file])
@@ -31,7 +40,7 @@ pub enum Error {
   ExcelRead,
   EmptyFile,
   InvalidSheetFormat,
-  Translation(deepl_api::Error),
+  Translation(phdb_translate::Error),
   SystemIO(std::io::Error),
   SerdeJson(serde_json::Error),
 }
@@ -42,8 +51,8 @@ impl From<tauri::Error> for Error {
   }
 }
 
-impl From<deepl_api::Error> for Error {
-  fn from(e: deepl_api::Error) -> Self {
+impl From<phdb_translate::Error> for Error {
+  fn from(e: phdb_translate::Error) -> Self {
     Self::Translation(e)
   }
 }

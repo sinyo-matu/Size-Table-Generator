@@ -1,10 +1,12 @@
-use calamine::{open_workbook, Reader, Xlsx};
-use deepl_api::{DeepL, SplitSentences, TranslatableTextList, TranslationOptions};
-use itertools::Itertools;
-use rayon::prelude::*;
-use serde::Serialize;
+use std::sync::Arc;
 
-use crate::{config::load_config, Error, Result};
+use calamine::{open_workbook, Reader, Xlsx};
+use itertools::Itertools;
+use phdb_translate::TranslateClient;
+use serde::Serialize;
+use std::sync::Mutex;
+
+use crate::{Error, Result};
 
 #[derive(Serialize)]
 pub struct ProcessResponse {
@@ -35,9 +37,12 @@ struct ProcessingStatePayload {
   state: String,
 }
 
+type SharedTranslateClient = Arc<Mutex<TranslateClient>>;
+
 #[tauri::command]
-pub async fn process_excel_file(
+pub fn process_excel_file(
   window: tauri::Window,
+  translate_client: tauri::State<'_, SharedTranslateClient>,
   excel_path: String,
 ) -> std::result::Result<ProcessResponse, String> {
   println!("command invoked");
@@ -98,7 +103,8 @@ pub async fn process_excel_file(
       },
     )
     .unwrap();
-  let size_text_unique_zh = translate_text(&size_text_unique)?;
+  let mut local_client = translate_client.lock().unwrap();
+  let size_text_unique_zh = local_client.translate(&size_text_unique).unwrap();
   window
     .emit(
       "update-state",
@@ -108,11 +114,10 @@ pub async fn process_excel_file(
     )
     .unwrap();
   let item_code_size_data = items_code_unique
-    .par_bridge()
     .map(|code| {
       item_code_size_unique
-        .par_iter()
-        .zip(size_text_unique_zh.par_iter())
+        .iter()
+        .zip(size_text_unique_zh.iter())
         .filter(|(row, _)| row[item_code_idx].to_string().replace(' ', "_") == code)
         .map(|(row, size_text_zh)| ItemInfo {
           code: row[item_code_idx].to_string().replace(' ', "_"),
@@ -134,7 +139,7 @@ pub async fn process_excel_file(
       .collect::<Vec<_>>();
     table_head.insert(0, String::from("尺码"));
     let table_body = item_infos
-      .par_iter()
+      .iter()
       .map(|item_info| {
         let mut size_row_raw = item_info
           .size_text
@@ -162,53 +167,9 @@ pub async fn process_excel_file(
 
 fn check_column(i: usize, s: impl AsRef<str>) -> Result<usize> {
   match s.as_ref() {
-    "品番" => Ok(i),
-    "SZ" => Ok(i),
-    "採寸" => Ok(i),
+    "品番" | "SZ" | "採寸" => Ok(i),
     _ => Err(Error::InvalidSheetFormat),
   }
-}
-
-fn translate_text(text: impl AsRef<[String]>) -> Result<Vec<String>> {
-  let config = load_config()?;
-  let deepl = DeepL::new(config.deepl_api_key);
-
-  let texts = TranslatableTextList {
-    source_language: Some("JA".to_string()),
-    target_language: "ZH".to_string(),
-    texts: text
-      .as_ref()
-      .iter()
-      .map(escape_text_pre_translate)
-      .collect(),
-  };
-  let options = TranslationOptions {
-    split_sentences: Some(SplitSentences::None),
-    preserve_formatting: Some(true),
-    formality: None,
-  };
-  let translated = deepl
-    .translate(Some(options), texts)
-    .map_err(Error::Translation)?;
-  Ok(
-    translated
-      .iter()
-      .map(|trans| escape_text(&trans.text))
-      .collect(),
-  )
-}
-fn escape_text_pre_translate(s: impl AsRef<str>) -> String {
-  s.as_ref()
-    .replace("ゆき", "袖長さ")
-    .replace("着丈", "ボディー長さ")
-    .replace("ゆき丈", "袖長さ")
-}
-
-fn escape_text(input: &str) -> String {
-  input
-    .replace("车身宽度", "体宽")
-    .replace("YUKI", "臂展")
-    .replace("内裤", "跨部下方")
 }
 
 fn get_size_code(num_str: &str) -> String {
