@@ -1,7 +1,7 @@
 mod error;
 pub use error::Error;
 use gcp_auth::{AuthenticationManager, Token};
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::Deserialize;
 
 use crate::error::Result;
@@ -45,7 +45,7 @@ impl TranslateClient {
     let token = auth_manager.get_token(SCOPES).await?;
     Ok(Self {
       gcp_token: token,
-      http_client: reqwest::blocking::Client::new(),
+      http_client: reqwest::Client::new(),
       auth_manager,
     })
   }
@@ -56,7 +56,7 @@ impl TranslateClient {
     Ok(())
   }
 
-  pub fn translate(&mut self, inputs: &[String]) -> Result<Vec<String>> {
+  pub async fn translate(&mut self, inputs: &[String]) -> Result<Vec<String>> {
     let glossary_path = std::env::var("GLOSSARY_PATH").unwrap();
     let translate_request_data = serde_json::json!(
         {
@@ -77,13 +77,14 @@ impl TranslateClient {
       .header("Content-Type", "application/json; charset=utf-8")
       .json(&translate_request_data)
       .bearer_auth(token_str.trim())
-      .send()?;
+      .send()
+      .await?;
     if resp.status().as_u16() >= 300 {
-      let resp_message: GoogleTranslateFailedResponse = resp.json()?;
+      let resp_message: GoogleTranslateFailedResponse = resp.json().await?;
       return Err(Error::TranslateResponse(resp_message.error.message));
     }
 
-    let res: GoogleTranslateSuccessResponse = resp.json()?;
+    let res: GoogleTranslateSuccessResponse = resp.json().await?;
 
     Ok(
       res

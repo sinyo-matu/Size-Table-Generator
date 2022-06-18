@@ -4,7 +4,7 @@ use calamine::{open_workbook, Reader, Xlsx};
 use itertools::Itertools;
 use phdb_translate::TranslateClient;
 use serde::Serialize;
-use std::sync::Mutex;
+use tauri::async_runtime::Mutex;
 
 use crate::{Error, Result};
 
@@ -40,7 +40,7 @@ struct ProcessingStatePayload {
 type SharedTranslateClient = Arc<Mutex<TranslateClient>>;
 
 #[tauri::command]
-pub fn process_excel_file(
+pub async fn process_excel_file(
   window: tauri::Window,
   translate_client: tauri::State<'_, SharedTranslateClient>,
   excel_path: String,
@@ -103,8 +103,8 @@ pub fn process_excel_file(
       },
     )
     .unwrap();
-  let mut local_client = translate_client.lock().unwrap();
-  let size_text_unique_zh = local_client.translate(&size_text_unique).unwrap();
+  let mut local_client = translate_client.lock().await;
+  let size_text_unique_zh = local_client.translate(&size_text_unique).await.unwrap();
   window
     .emit(
       "update-state",
