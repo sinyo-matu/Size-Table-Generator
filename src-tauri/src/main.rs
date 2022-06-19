@@ -7,27 +7,23 @@ mod config;
 mod custom_command;
 
 use phdb_translate::TranslateClient;
-use std::{
-  ops::Deref,
-  sync::{Arc, Mutex},
-};
-use tauri::Manager;
+use std::{ops::Deref, sync::Arc};
+use tauri::async_runtime::Mutex;
 
 use custom_command::process_excel_file;
 
 pub const APP_IDENTIFIER: &str = "Size Table Generator";
 
 fn main() {
+  let translate_client = tauri::async_runtime::block_on(TranslateClient::new()).unwrap();
+  let client = Arc::new(Mutex::new(translate_client));
   tauri::Builder::default()
+    .manage(client)
     .setup(|app| {
       let path_base = tauri::api::path::app_dir(app.config().deref()).unwrap();
       if tauri::api::dir::is_dir(&path_base).is_err() {
         std::fs::create_dir(path_base).unwrap();
       }
-      let translate_client = tauri::async_runtime::block_on(TranslateClient::new()).unwrap();
-      let shared_translate_client = Arc::new(Mutex::new(translate_client));
-      let handler = app.handle();
-      handler.manage(shared_translate_client);
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![process_excel_file])

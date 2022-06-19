@@ -16,7 +16,7 @@ pub struct ProcessResponse {
 struct ItemInfo {
   code: String,
   size_code: String,
-  size_text: String,
+  size_text: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -37,13 +37,11 @@ struct ProcessingStatePayload {
   state: String,
 }
 
-type SharedTranslateClient = Arc<Mutex<TranslateClient>>;
-
 #[tauri::command]
 pub async fn process_excel_file(
   window: tauri::Window,
-  translate_client: tauri::State<'_, SharedTranslateClient>,
   excel_path: String,
+  client: tauri::State<'_, Arc<Mutex<TranslateClient>>>,
 ) -> std::result::Result<ProcessResponse, String> {
   println!("command invoked");
   window
@@ -73,7 +71,8 @@ pub async fn process_excel_file(
     .rows()
     .skip(1)
     .map(|row| row[item_code_idx].to_string().replace(' ', "_"))
-    .unique();
+    .sorted()
+    .dedup();
   let item_code_size_unique = items_code_sheet
     .rows()
     .skip(1)
@@ -93,7 +92,13 @@ pub async fn process_excel_file(
         row[size_code_idx].to_string(),
       )
     })
-    .map(|row| row[size_text_idx].to_string())
+    .map(|row| {
+      row[size_text_idx]
+        .to_string()
+        .split_whitespace()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>()
+    })
     .collect_vec();
   window
     .emit(
@@ -103,8 +108,12 @@ pub async fn process_excel_file(
       },
     )
     .unwrap();
-  let mut local_client = translate_client.lock().await;
-  let size_text_unique_zh = local_client.translate(&size_text_unique).await.unwrap();
+  let mut local_client = client.lock().await;
+  let mut size_text_zh_vec = Vec::new();
+  for size_text in size_text_unique {
+    let size_text_zh = local_client.translate(&size_text).await.unwrap();
+    size_text_zh_vec.push(size_text_zh);
+  }
   window
     .emit(
       "update-state",
@@ -117,7 +126,7 @@ pub async fn process_excel_file(
     .map(|code| {
       item_code_size_unique
         .iter()
-        .zip(size_text_unique_zh.iter())
+        .zip(size_text_zh_vec.iter())
         .filter(|(row, _)| row[item_code_idx].to_string().replace(' ', "_") == code)
         .map(|(row, size_text_zh)| ItemInfo {
           code: row[item_code_idx].to_string().replace(' ', "_"),
@@ -132,10 +141,14 @@ pub async fn process_excel_file(
     let item_code = item_infos[0].code.clone();
     let mut table_head = item_infos[0]
       .size_text
-      .replace('：', ":")
-      .replace(": ", ":")
-      .split_whitespace()
-      .map(|s| s.split(':').collect_vec()[0].to_string())
+      .iter()
+      .map(|s| {
+        s.replace('：', ":")
+          .replace(": ", ":")
+          .split(':')
+          .collect_vec()[0]
+          .to_string()
+      })
       .collect::<Vec<_>>();
     table_head.insert(0, String::from("尺码"));
     let table_body = item_infos
@@ -143,10 +156,14 @@ pub async fn process_excel_file(
       .map(|item_info| {
         let mut size_row_raw = item_info
           .size_text
-          .replace('：', ":")
-          .replace(": ", ":")
-          .split_whitespace()
-          .map(|s| s.split(':').collect_vec()[1].to_string())
+          .iter()
+          .map(|s| {
+            s.replace('：', ":")
+              .replace(": ", ":")
+              .split(':')
+              .collect_vec()[1]
+              .to_string()
+          })
           .collect::<Vec<_>>();
         size_row_raw.insert(0, item_info.size_code.to_owned());
         size_row_raw

@@ -1,12 +1,14 @@
 mod error;
+
 pub use error::Error;
 use gcp_auth::{AuthenticationManager, Token};
 use reqwest::Client;
 use serde::Deserialize;
 
 use crate::error::Result;
+
 const TRANSLATE_URL: &str =
-  "https://translation.googleapis.com/v3/projects/{}/locations/us-central1:translateText";
+  "https://translation.googleapis.com/v3/projects/phdb-translate/locations/us-central1:translateText";
 pub struct TranslateClient {
   gcp_token: Token,
   http_client: Client,
@@ -57,23 +59,21 @@ impl TranslateClient {
   }
 
   pub async fn translate(&mut self, inputs: &[String]) -> Result<Vec<String>> {
-    let glossary_path = std::env::var("GLOSSARY_PATH").unwrap();
     let translate_request_data = serde_json::json!(
         {
           "sourceLanguageCode": "ja",
           "targetLanguageCode": "zh",
           "contents": inputs,
             "glossaryConfig": {
-            "glossary": glossary_path
+            "glossary":"projects/phdb-translate/locations/us-central1/glossaries/phdb-glossary1"
           }
         }
     );
 
     let token_str = self.gcp_token.as_str();
-    let project_id = std::env::var("PROJECT_ID").unwrap();
     let resp = self
       .http_client
-      .post(TRANSLATE_URL.replace("{}", &project_id))
+      .post(TRANSLATE_URL)
       .header("Content-Type", "application/json; charset=utf-8")
       .json(&translate_request_data)
       .bearer_auth(token_str.trim())
