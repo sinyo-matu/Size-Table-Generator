@@ -7,7 +7,7 @@ mod config;
 mod custom_command;
 
 use phdb_translate::TranslateClient;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 use tauri::async_runtime::Mutex;
 
 use custom_command::process_excel_file;
@@ -19,13 +19,6 @@ fn main() {
   let client = Arc::new(Mutex::new(translate_client));
   tauri::Builder::default()
     .manage(client)
-    .setup(|app| {
-      let path_base = tauri::api::path::app_dir(app.config().deref()).unwrap();
-      if tauri::api::dir::is_dir(&path_base).is_err() {
-        std::fs::create_dir(path_base).unwrap();
-      }
-      Ok(())
-    })
     .invoke_handler(tauri::generate_handler![process_excel_file])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
@@ -36,6 +29,7 @@ pub enum Error {
   ExcelRead,
   EmptyFile,
   InvalidSheetFormat,
+  EmptySizeText,
   Translation(phdb_translate::Error),
   SystemIO(std::io::Error),
   SerdeJson(serde_json::Error),
@@ -72,6 +66,7 @@ impl From<Error> for String {
       Error::EmptyFile => String::from("文件是空文件"),
       Error::ExcelRead => String::from("请选择需要打开的Excel文件"),
       Error::InvalidSheetFormat => String::from("请打开格式正确的Excel文件"),
+      Error::EmptySizeText => String::from("[採寸]列不能是空栏"),
       Error::Translation(_) => String::from("翻译失败"),
       Error::SystemIO(_) => String::from("设定文件读取错误"),
       Error::SerdeJson(e) => {

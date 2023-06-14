@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{iter::FromIterator, sync::Arc};
 
 use calamine::{open_workbook, Reader, Xlsx};
 use itertools::Itertools;
@@ -93,8 +93,7 @@ pub async fn process_excel_file(
       )
     })
     .map(|row| {
-      row[size_text_idx]
-        .to_string()
+      escape_colon_whitespace(row[size_text_idx].to_string())
         .split_whitespace()
         .map(|s| s.to_string())
         .collect::<Vec<_>>()
@@ -111,6 +110,9 @@ pub async fn process_excel_file(
   let mut local_client = client.lock().await;
   let mut size_text_zh_vec = Vec::new();
   for size_text in size_text_unique {
+    if size_text.is_empty() {
+      return Err(Error::EmptySizeText.into());
+    }
     let size_text_zh = local_client.translate(&size_text).await.unwrap();
     size_text_zh_vec.push(size_text_zh);
   }
@@ -142,13 +144,7 @@ pub async fn process_excel_file(
     let mut table_head = item_infos[0]
       .size_text
       .iter()
-      .map(|s| {
-        s.replace('：', ":")
-          .replace(": ", ":")
-          .split(':')
-          .collect_vec()[0]
-          .to_string()
-      })
+      .map(|s| escape_colon_whitespace(s).split(':').collect_vec()[0].to_string())
       .collect::<Vec<_>>();
     table_head.insert(0, String::from("尺码"));
     let table_body = item_infos
@@ -157,13 +153,7 @@ pub async fn process_excel_file(
         let mut size_row_raw = item_info
           .size_text
           .iter()
-          .map(|s| {
-            s.replace('：', ":")
-              .replace(": ", ":")
-              .split(':')
-              .collect_vec()[1]
-              .to_string()
-          })
+          .map(|s| escape_colon_whitespace(s).split(':').collect_vec()[1].to_string())
           .collect::<Vec<_>>();
         size_row_raw.insert(0, item_info.size_code.to_owned());
         size_row_raw
@@ -201,4 +191,11 @@ fn get_size_code(num_str: &str) -> String {
     "8" => String::from("XXXXL"),
     _ => String::from("均码"),
   }
+}
+
+fn escape_colon_whitespace(s: impl AsRef<str>) -> String {
+  s.as_ref()
+    .replace('：', ":")
+    .replace(": ", ":")
+    .replace('　', " ")
 }
