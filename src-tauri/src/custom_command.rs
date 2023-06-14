@@ -173,7 +173,7 @@ pub async fn process_excel_file(
 }
 
 fn check_column(i: usize, s: impl AsRef<str>) -> Result<usize> {
-  match s.as_ref() {
+  match s.as_ref().trim() {
     "品番" | "SZ" | "採寸" => Ok(i),
     _ => Err(Error::InvalidSheetFormat),
   }
